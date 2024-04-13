@@ -10,6 +10,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Properties;
+import java.util.Scanner;
 
 public class Main {
 	public static void main(String[] args) {
@@ -21,14 +22,22 @@ public class Main {
 			throw new RuntimeException(e);
 		}
 
-		String albumName = "Tapestry";
-		String query = "SELECT * FROM music.albumview WHERE album_name='%s'"
-				.formatted(albumName);
+//		Scanner scanner = new Scanner(System.in);
+//		System.out.println("Enter an Album Name: ");
+//		String albumName = scanner.nextLine();
+//		String query = "SELECT * FROM music.albumview WHERE album_name='%s'"
+//				.formatted(albumName);
+		String query = "SELECT * FROM music.artists limit 10";
 
 		var dataSource = new MysqlDataSource();
 		dataSource.setServerName(properties.getProperty("serverName"));
 		dataSource.setPort(Integer.parseInt(properties.getProperty("port")));
 		dataSource.setDatabaseName(properties.getProperty("databaseName"));
+		try {
+			dataSource.setMaxRows(10);
+		} catch (SQLException e) {
+			throw new RuntimeException(e);
+		}
 
 		try (var connection = dataSource.getConnection(properties.getProperty("user"), System.getenv("MYSQL_PASS"));
 			 Statement statement = connection.createStatement();) {
