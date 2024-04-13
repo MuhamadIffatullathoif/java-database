@@ -2,10 +2,12 @@ package org.iffat.prepared_statement;
 
 import com.mysql.cj.jdbc.MysqlDataSource;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.sql.*;
+import java.util.Arrays;
+import java.util.List;
 
 public class Main {
 
@@ -32,9 +34,11 @@ public class Main {
 				System.getenv("MYSQL_USER"),
 				System.getenv("MYSQL_PASS")
 		)) {
+			addDataFromFile(connection);
+
 			String sql = "SELECT * FROM music.albumview where artist_name = ?";
 			PreparedStatement ps = connection.prepareStatement(sql);
-			ps.setString(1, "Elf");
+			ps.setString(1, "Bob Dylan");
 			ResultSet resultSet = ps.executeQuery();
 			printRecords(resultSet);
 		} catch (SQLException e) {
@@ -97,20 +101,60 @@ public class Main {
 		return albumId;
 	}
 
-	private static int addSong(PreparedStatement ps, Connection conn, int albumId,
+	private static void addSong(PreparedStatement ps, Connection conn, int albumId,
 							   int trackNo, String songTitle) throws SQLException {
-		int songId = -1;
 		ps.setInt(1, albumId);
 		ps.setInt(2, trackNo);
 		ps.setString(3, songTitle);
-		int insertedCount = ps.executeUpdate();
-		if (insertedCount > 0) {
-			ResultSet generatedKeys = ps.getGeneratedKeys();
-			if (generatedKeys.next()) {
-				songId = generatedKeys.getInt(1);
-				System.out.println("Auto-incremented ID: " + songId);
-			}
+		ps.addBatch();
+//		int insertedCount = ps.executeUpdate();
+//		if (insertedCount > 0) {
+//			ResultSet generatedKeys = ps.getGeneratedKeys();
+//			if (generatedKeys.next()) {
+//				songId = generatedKeys.getInt(1);
+//				System.out.println("Auto-incremented ID: " + songId);
+//			}
+//		}
+	}
+
+	private static void addDataFromFile(Connection connection) throws SQLException {
+
+		List<String> records = null;
+		try {
+			records = Files.readAllLines(Path.of("NewAlbums.csv"));
+		} catch (IOException e) {
+			throw new RuntimeException(e);
 		}
-		return songId;
+
+		String lastAlbum = null;
+		String lastArtist = null;
+		int artistId = -1;
+		int albumId = -1;
+		try (PreparedStatement psArtist = connection.prepareStatement(ARTIST_INSERT, Statement.RETURN_GENERATED_KEYS);
+			 PreparedStatement psAlbum = connection.prepareStatement(ALBUM_INSERT, Statement.RETURN_GENERATED_KEYS);
+			 PreparedStatement psSong = connection.prepareStatement(SONG_INSERT, Statement.RETURN_GENERATED_KEYS)) {
+			connection.setAutoCommit(false);
+
+			for (String record : records) {
+				String[] columns = record.split(",");
+				if (lastArtist == null || !lastArtist.equals(columns[0])) {
+					lastArtist = columns[0];
+					artistId = addArtist(psArtist, connection, lastArtist);
+				}
+				if (lastAlbum == null || !lastAlbum.equals(columns[1])) {
+					lastAlbum = columns[1];
+					albumId = addAlbum(psAlbum, connection, artistId, lastAlbum);
+				}
+				addSong(psSong, connection, albumId, Integer.parseInt(columns[2]), columns[3]);
+			}
+			int[] inserts = psSong.executeBatch();
+			int totalInserts = Arrays.stream(inserts).sum();
+			System.out.printf("%d song records added %n", inserts.length);
+			connection.commit();
+			connection.setAutoCommit(true);
+		} catch (SQLException e) {
+			connection.rollback();
+			throw new RuntimeException(e);
+		}
 	}
 }
