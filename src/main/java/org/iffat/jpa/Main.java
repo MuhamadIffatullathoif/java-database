@@ -14,13 +14,13 @@ public class Main {
 			var transaction = entityManager.getTransaction();
 			transaction.begin();
 			// entityManager.persist(new Artist("Muddy Water"));
-			Artist artist = entityManager.find(Artist.class, 201);
+			Artist artist = entityManager.find(Artist.class, 103);
 			//Artist artist = new Artist(207, "Muddy Waters");
 			//entityManager.merge(artist); // must use merge for constructor to persists db
 			System.out.println(artist);
-			artist.addAlbum("The Best of Muddy Waters");
+			//artist.addAlbum("The Best of Muddy Waters");
 			// artist.removeDuplicates();
-			System.out.println(artist);
+			//System.out.println(artist);
 			// entityManager.remove(artist);
 			// artist.setArtistName("Muddy Waters"); // auto persists because transaction.commit()
 			transaction.commit();
